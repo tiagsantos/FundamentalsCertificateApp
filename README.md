@@ -1,11 +1,11 @@
 # FundamentalsCertificateApp
 
 
-**Overview**
+**I. Overview**
 
 The project was created using the empty-skeleton template, with the objective of allowing a customer to make purchases at a computer store and have a courier take those purchases to the customer's home. The customer has to have a bank account and a computer store account in order to do the shopping.
 
-**Features**
+**II. Workflow**
 1.	The customer and the computer store must have a bank account;
 2.	The customer must have an account at the computer store.
 3.	When the customer has an account at the computer store, he can order a list of products that he wants to buy;
@@ -16,7 +16,7 @@ The project was created using the empty-skeleton template, with the objective of
 8.	8.	After the customer accepts, a transaction is made from the customer's bank account to the computer store's bank account;
 9.	Finally, an invoice is created with the customer's purchase.
 
-**Parties**
+**III. Parties**
 
 - Store – Computer store;
 - Client – Person who buys the products in the computer store;
@@ -24,25 +24,39 @@ The project was created using the empty-skeleton template, with the objective of
 - Bank – Bank where the customer has money to pay for purchases at the computer store;
 - Other – Other parties used to unhappy test.
 
-
-**Choices**
+**IV. Choices**
 
 | Template | Choice | Description |
 | -------------------------- | -------------------------------- | ---------------- |
-| Bank | CreateAccountBankProposal | xx |
-| BankAccountProposal | CreateAccountBank | xx |
-| BankAccount | CreditAmount | xxxx |
-| Store | CreateAccount StoreProposal | xxxx |
-| Store | AddStockProducts | xxxx |
-| ClientAccountStoreProposal | RejectStoreAccountProposal | xxxx |
-| ClientAccountStoreProposal | CreateAccountStore | xxxx |
-| ClientAccountStore | - | xxxx |
-| StockProducts | AddProductToStock | xxxx |
-| StockProducts | OrderProductProposal | xxxx |
-| StockProducts | UpdateProductToStock | xxxx |
-| OrderProduct | ValidateOrderByStore | xxxx |
-| OrderCourier | ApproveOrderByClient | xxxx |
-| OrderCourier | RejectOrderByClient | xxxx |
-| TransactionPaymentDebit | ValidateTransactionPaymentDebit | xxxx |
-| TransactionPaymentCredit | ValidateTransactionPaymentCredit | xxxx |
-| Transaction | - | xxxx |
+| Bank | CreateAccountBankProposal | This choice serves to client propose create account in the bank |
+| BankAccountProposal | RejectBankAccountProposal | This choice serves to bank reject create account in the bank |
+| BankAccountProposal | CreateAccountBank | This choice serves to bank approve and create account in the bank |
+| BankAccount | CreditAmount | This choice serves to bank accept the credit amount to the customer's |
+| BankAccount | DebitAmount | This choice serves to bank accept the debit the customer's account |
+| Store | CreateAccountStoreProposal | This choice creates a new proposal to create an account in the store |
+| Store | AddStockProducts | This choice serves to add new products to the stock |
+| ClientAccountStoreProposal | RejectStoreAccountProposal | This choice allows reject the proposal to create an account |
+| ClientAccountStoreProposal | CreateAccountStore | This choice serves to create account store |
+| ClientAccountStore | - | - |
+| StockProducts | AddProductToStock | This choice add products to stock |
+| StockProducts | OrderProductProposal | This choice create a proposal to product orders |
+| StockProducts | UpdateProductToStock | This choice update the product stock or not if the number of produtos is equals 0 or less |
+| OrderProduct | ValidateOrderByStore | This choice validate the order by the store and accept or reject the order |
+| OrderCourier | ApproveOrderByClient | This choice approve the purchase by the customer |
+| OrderCourier | RejectOrderByClient | This choice reject the order by the customer |
+| TransactionPaymentDebit | ValidateTransactionPaymentDebit | This choice validates the debit amount transaction |
+| TransactionPaymentCredit | ValidateTransactionPaymentCredit | This choice credits the amount to a new account |
+| Transaction | - | - |
+
+
+**V. Diagram**
+
+-----------
+
+**VI. Tests**
+
+-----
+
+**VII. Notes**
+
+ - This project was created with Daml version 2.6.0.
