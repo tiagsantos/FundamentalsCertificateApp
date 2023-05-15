@@ -25,8 +25,24 @@ The project was created using the empty-skeleton template, with the objective of
 - Other – Other parties used to unhappy test.
 
 
-
+**Choices**
 
 | Template | Choice | Description |
-| -------------------------- | -------------------------------- | ---------------- | 
-||||
+| -------------------------- | -------------------------------- | ---------------- |
+| Bank | CreateAccountBankProposal | xx |
+| BankAccountProposal | CreateAccountBank | xx |
+| BankAccount | CreditAmount | xxxx |
+| Store | CreateAccount StoreProposal | xxxx |
+| Store | AddStockProducts | xxxx |
+| ClientAccountStoreProposal | RejectStoreAccountProposal | xxxx |
+| ClientAccountStoreProposal | CreateAccountStore | xxxx |
+| ClientAccountStore | - | xxxx |
+| StockProducts | AddProductToStock | xxxx |
+| StockProducts | OrderProductProposal | xxxx |
+| StockProducts | UpdateProductToStock | xxxx |
+| OrderProduct | ValidateOrderByStore | xxxx |
+| OrderCourier | ApproveOrderByClient | xxxx |
+| OrderCourier | RejectOrderByClient | xxxx |
+| TransactionPaymentDebit | ValidateTransactionPaymentDebit | xxxx |
+| TransactionPaymentCredit | ValidateTransactionPaymentCredit | xxxx |
+| Transaction | - | xxxx |
