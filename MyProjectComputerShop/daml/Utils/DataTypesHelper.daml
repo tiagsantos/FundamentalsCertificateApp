@@ -1,0 +1,31 @@
+module Utils.DataTypesHelper where
+
+{-
+    Data record create with main usefull information of client
+-}
+data Client = Client with
+  name: Text
+  address: Text
+  telephone : Text
+    deriving (Eq, Show)
+
+{-
+    Data record create with main usefull information of product
+-}
+data Product = Product with
+  reference: Text
+  name: Text
+  numberInStock: Int
+  price: Decimal
+  priceWithFees : Decimal
+    deriving (Eq, Show)
+
+{-
+    Data record create with main usefull information of product to Bill
+-}
+data ProductInvoice = ProductInvoice with
+  reference: Text
+  name: Text
+  amountRequested: Int
+  priceWithFees: Decimal
+    deriving (Eq, Show)

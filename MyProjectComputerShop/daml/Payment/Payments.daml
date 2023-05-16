@@ -1,0 +1,116 @@
+module Payment.Payments where
+
+import Utils.DataTypesHelper
+import Bank.ManagementBank
+
+{-
+    This template is used to store the transaction payment debit from client
+-}
+template TransactionPaymentDebit
+    with
+        bankAdmin: Party
+        storeAdmin: Party
+        client: Party
+        totalAmount: Decimal
+        createTransactionPayment: Time
+
+    where
+        signatory client 
+        observer bankAdmin
+        
+        key(client,bankAdmin)    : (Party, Party)
+        maintainer key._1
+
+{-
+    This choice validates the debit amount transaction
+-}
+        choice ValidateTransactionPaymentDebit: ContractId BankAccount
+            controller bankAdmin
+            do
+                (obtainAccountId, obtainAccount) <- fetchByKey @BankAccount (client, bankAdmin)
+                
+                assertMsg "Error ValidateTransactionPaymentDebit: Invalid amount to buy the products" (obtainAccount.amount>=totalAmount)
+
+                exerciseByKey @BankAccount (client, bankAdmin) with DebitAmount
+                    with
+                        amountToDebit = totalAmount
+
+{-
+     This template is used to store the transaction payment credit to client (in this case store)
+-}
+template TransactionPaymentCredit
+    with
+        bankAdmin: Party
+        storeAdmin: Party
+        client: Party
+        totalAmount: Decimal
+        createTransactionPayment: Time
+    where
+        signatory storeAdmin 
+        observer bankAdmin
+        
+        key(storeAdmin,bankAdmin)    : (Party, Party)
+        maintainer key._1
+ {-
+    This choice credits the amount to a new account
+-}       
+        choice ValidateTransactionPaymentCredit: ContractId BankAccount
+            controller bankAdmin
+            do
+                exerciseByKey @BankAccount (storeAdmin, bankAdmin) with CreditAmount
+                    with
+                        amountToCredit = totalAmount
+
+{-
+     This template is used to store the transaction payment (approved or rejected by bank)
+-}
+template Transaction
+    with
+        bankAdmin: Party
+        amountDebit: TransactionPaymentDebit
+        amountCredit: TransactionPaymentCredit
+        totalAmount: Decimal
+        product: ProductInvoice
+    where
+        signatory amountDebit.client, amountCredit.storeAdmin 
+        observer bankAdmin 
+        ensure bankAdmin /= amountDebit.client && bankAdmin /= amountDebit.storeAdmin
+        key(amountDebit.client, amountCredit.storeAdmin)    : (Party,Party)
+        maintainer key._2
+ 
+ {-
+    This choice debits an amount from an account and credits another account (client bank account to store bank account)
+-}       
+        choice ValidateTransaction: ContractId InvoiceIssued
+            controller bankAdmin
+                do
+                    exerciseByKey @TransactionPaymentDebit (amountDebit.client,bankAdmin) with ValidateTransactionPaymentDebit
+
+                    exerciseByKey @TransactionPaymentCredit (amountCredit.storeAdmin,bankAdmin) with  ValidateTransactionPaymentCredit
+
+                    createInvoice <- getTime
+                    let
+                        client = amountDebit.client
+                        storeAdmin = amountCredit.storeAdmin
+                    
+                    trace "Teste ValidateTransaction"  (create InvoiceIssued with ..)
+                  
+{-
+     This template is used to store the invoice issued
+-}
+template InvoiceIssued
+    with
+        bankAdmin: Party
+        storeAdmin: Party
+        client: Party
+        product: ProductInvoice
+        totalAmount: Decimal
+        createInvoice: Time
+
+    where
+        signatory bankAdmin 
+        observer client, storeAdmin
+        
+        key(bankAdmin,storeAdmin,client)    : (Party, Party, Party)
+        maintainer key._1
+

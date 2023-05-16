@@ -1,0 +1,219 @@
+module UnitTests.ManagementProductsTest where
+
+import Daml.Script
+import Bank.ManagementBank
+import Utils.DataTypesHelper
+import ComputerStore.ManagementClients
+import ComputerStore.ManagementProducts
+import Payment.Payments
+
+setup : Script ()
+setup = script do
+
+
+    now <- getTime
+    bank <- allocatePartyWithHint "BankAdministrator" (PartyIdHint "BankAdministrator") -- Bank 
+    store <- allocatePartyWithHint "StoreAdministrator" (PartyIdHint "StoreAdministrator") -- Store
+    fabio <- allocatePartyWithHint "Fabio" (PartyIdHint "Fabio") -- Client
+    tiago <- allocatePartyWithHint "Tiago" (PartyIdHint "Tiago") -- Courier
+
+
+---------------------------- Start: Equal happy test ----------------------------
+---------------------------------------------------------------------------------
+
+---------------------------- Start: create a bank and accounts in bank ----------------------------
+    basicBankTemplate <- submit bank do
+        createCmd Bank 
+            with
+                bankAdmin = bank
+                name = "Santander"
+                interestedList = [fabio,store] 
+    
+    let clientStore = Client with 
+            name = "Computer Store Tiago Jesus"
+            address = "Rua Santa Maria, Lote 33, 254-122 Almada"
+            telephone = "+35112223333"
+
+    basicBankAccountTemplate <- submit store do
+       exerciseCmd basicBankTemplate with CreateAccountBankProposal 
+           with
+               client = store
+               personalClientInf = clientStore
+
+    basicBankAccountTemplate <- submit bank do
+       exerciseCmd basicBankAccountTemplate with CreateAccountBank
+           
+    let clientInf = Client with 
+             name = "Fábio Figueiredo Chaves"
+             address = "Rua Cidade Ponta Delgada, Lote 34, 234-122 Lisboa"
+             telephone = "+351973232341"
+
+    basicFabioAccountTemplate <- submit fabio do
+       exerciseCmd basicBankTemplate with CreateAccountBankProposal 
+           with
+               client = fabio
+               personalClientInf = clientInf
+
+    basicFabioAccountTemplate <- submit bank do
+       exerciseCmd basicFabioAccountTemplate with CreateAccountBank
+
+    basicFabioAccountTemplate <- submit bank do
+        exerciseCmd basicFabioAccountTemplate with CreditAmount 
+            with
+                amountToCredit = 10000.0
+
+---------------------------- End: create a bank and accounts in bank ----------------------------
+
+---------------------------- Start: Create store and accounts in store ----------------------------
+
+    basicStoreTemplate <- submit store do
+        createCmd Store 
+            with
+                storeAdmin = store
+                name = "Store of Computer"
+                interestedList = [fabio, tiago, bank] 
+
+
+    basicFabioAccountStoreTemplate <- submit fabio do
+       exerciseCmd basicStoreTemplate with CreateAccountStoreProposal 
+           with
+               client = fabio
+               personalClientInf = clientInf
+
+    basicFabioAccountStoreTemplate <- submit store do
+       exerciseCmd basicFabioAccountStoreTemplate with CreateAccountStore
+
+---------------------------- End: Create store and accounts in store ----------------------------
+
+
+---------------------------- End: Equal happy test ----------------------------
+---------------------------------------------------------------------------------
+
+
+
+---------------------------- Start: Add products to Stock ----------------------------
+
+    let productInf1 = Product with 
+           reference = "0001"
+           name = "KeyBoard"
+           price = 220.0
+           priceWithFees = 221.0
+           numberInStock = 6
+
+        productInf2 = Product with 
+           reference = "0002"
+           name = "Mouse"
+           price = 20.0
+           priceWithFees = 21.0
+           numberInStock = 60
+
+        productInf3 = Product with 
+           reference = "0003"
+           name = "Phones"
+           price = 50.0
+           priceWithFees = 51.0
+           numberInStock = 600
+
+        productInf4 = Product with 
+           reference = "0004"
+           name = "Cable type C"
+           price =  1.0
+           priceWithFees = 6.0
+           numberInStock = 30
+
+        productInf5 = Product with 
+           reference = "0005"
+           name = "Cable type C.3"
+           price =  1.0
+           priceWithFees = 6.0
+           numberInStock = -30
+
+
+    submitMustFail store do
+       exerciseCmd basicStoreTemplate with AddStockProducts
+        with
+            productsToAdd = Some [productInf5]
+
+    basicStockProductsTemplate <- submit store do
+       exerciseCmd basicStoreTemplate with AddStockProducts
+        with
+            productsToAdd = Some [productInf1, productInf2, productInf3]
+
+    submitMustFail store do
+       exerciseCmd basicStockProductsTemplate with AddProductToStock
+        with
+            productToAdd =  productInf5
+
+    basicStockProductsTemplate <- submit store do
+       exerciseCmd basicStockProductsTemplate with AddProductToStock
+        with
+            productToAdd =  productInf4
+
+---------------------------- End: Add products to Stock ----------------------------
+
+---------------------------- Start: Create order ----------------------------
+
+    submitMustFail fabio do
+        exerciseCmd basicStockProductsTemplate with OrderProductProposal
+            with
+                client = fabio
+                reference = "0999"
+                amountOfProducts = 2
+
+    submitMustFail fabio do
+        exerciseCmd basicStockProductsTemplate with OrderProductProposal
+            with
+                client = fabio
+                reference = "0001"
+                amountOfProducts = 0
+
+    basicOrderTemplate <- submit fabio do
+        exerciseCmd basicStockProductsTemplate with OrderProductProposal
+            with
+                client = fabio
+                reference = "0001"
+                amountOfProducts = 2
+
+---------------------------- End: Create order ----------------------------
+
+---------------------------- Start: Validate order by store ----------------------------
+
+    submitMustFail store do
+        exerciseCmd basicOrderTemplate with ValidateOrderByStore
+            with
+                courierAdmin = store
+    
+    submitMustFail store do
+        exerciseCmd basicOrderTemplate with ValidateOrderByStore
+            with
+                courierAdmin = fabio
+
+    basicValidateOrderByStoreTemplate <- submit store do
+        exerciseCmd basicOrderTemplate with ValidateOrderByStore
+            with
+                courierAdmin = tiago
+
+---------------------------- End:  Validate order by store ----------------------------
+
+---------------------------- Start: Client confirmation of purchase ----------------------------
+
+    submitMustFail store do
+        exerciseCmd basicValidateOrderByStoreTemplate with ApproveOrderByClient 
+            with 
+                bankAdmin = store
+
+    (basicStockProductsTemplate,basicApproveOrderByClientTemplate) <- submit fabio do
+        exerciseCmd basicValidateOrderByStoreTemplate with ApproveOrderByClient 
+            with 
+                bankAdmin = bank
+
+---------------------------- End: Client confirmation of purchase ----------------------------
+
+---------------------------- Start: Transaction validation by the bank  ----------------------------
+
+    basicValidateTransactionTemplate <- submit bank do
+        exerciseCmd basicApproveOrderByClientTemplate with ValidateTransaction 
+
+---------------------------- End: Transaction validation by the bank ----------------------------
+
+    return()

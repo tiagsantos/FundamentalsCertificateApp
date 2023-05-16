@@ -1,0 +1,137 @@
+module UnitTests.ManagementBankTest where
+
+import Daml.Script
+import Bank.ManagementBank
+import Utils.DataTypesHelper
+
+setup : Script ()
+setup = script do
+
+    now <- getTime
+    bank <- allocatePartyWithHint "BankAdministrator" (PartyIdHint "BankAdministrator") -- Bank 
+    store <- allocatePartyWithHint "StoreAdministrator" (PartyIdHint "StoreAdministrator") -- Store
+    fabio <- allocatePartyWithHint "Fabio" (PartyIdHint "Fabio") -- Client
+    tiago <- allocatePartyWithHint "Tiago" (PartyIdHint "Tiago") -- Courier
+    joao <- allocatePartyWithHint "Joao" (PartyIdHint "Joao") -- Other
+
+---------------------------- Start: create a bank and accounts in bank ----------------------------
+
+    -- Unhappy test to validate the name field
+    submitMustFail bank do
+        createCmd Bank 
+            with
+                bankAdmin = bank
+                name = ""
+                interestedList = [fabio,store] 
+
+    -- Unhappy test to validate party
+    submitMustFail store do
+        createCmd Bank 
+            with
+                bankAdmin = bank
+                name = "Santander"
+                interestedList = [fabio,store] 
+
+    -- Create a bank
+    basicBankTemplate <- submit bank do
+        createCmd Bank 
+            with
+                bankAdmin = bank
+                name = "Santander"
+                interestedList = [fabio,store, joao] 
+    
+    -- Customer information (store client)
+    let clientStore = Client with 
+            name = "Computer Store Tiago Jesus"
+            address = "Rua Santa Maria, Lote 33, 254-122 Almada"
+            telephone = "+35112223333"
+
+    -- Unhappy test to create a proposal account
+    submitMustFail store do
+       exerciseCmd basicBankTemplate with CreateAccountBankProposal 
+           with
+               client = joao
+               personalClientInf = clientStore
+
+    -- Create a proposal account
+    basicBankAccountTemplate <- submit store do
+       exerciseCmd basicBankTemplate with CreateAccountBankProposal 
+           with
+               client = store
+               personalClientInf = clientStore
+
+    -- Create unhappy test to create a bank account
+    submitMustFail fabio do
+       exerciseCmd basicBankAccountTemplate with CreateAccountBank
+
+    -- Create a bank account
+    basicBankAccountTemplate <- submit bank do
+       exerciseCmd basicBankAccountTemplate with CreateAccountBank
+
+     -- Customer information  (fabio client)   
+    let clientInf = Client with 
+             name = "Fábio Figueiredo Chaves"
+             address = "Rua Cidade Ponta Delgada, Lote 34, 234-122 Lisboa"
+             telephone = "+351973232341"
+
+    -- Create a proposal account
+    basicFabioAccountTemplate <- submit fabio do
+       exerciseCmd basicBankTemplate with CreateAccountBankProposal 
+           with
+               client = fabio
+               personalClientInf = clientInf
+
+    -- Customer information  (joao client)   
+    let clientInf = Client with 
+             name = "João Manuel Resendes"
+             address = "Rua Cidade Tomar, Lote 34, 234-122 Lisboa"
+             telephone = "+351973232342"
+
+    -- Create a proposal account
+    basicJoaoAccountTemplate <- submit joao do
+       exerciseCmd basicBankTemplate with CreateAccountBankProposal 
+           with
+               client = joao
+               personalClientInf = clientInf
+
+    -- Reject a bank account
+    basicJoaoAccountTemplate <- submit bank do
+       exerciseCmd basicJoaoAccountTemplate with RejectBankAccountProposal
+
+    -- Create a bank account
+    basicFabioAccountTemplate <- submit bank do
+       exerciseCmd basicFabioAccountTemplate with CreateAccountBank
+
+   -- Unhappy test to validate credit amount
+    submitMustFail bank do
+        exerciseCmd basicFabioAccountTemplate with CreditAmount
+            with 
+                amountToCredit = 0.0
+
+    -- Adding credit amount
+    basicFabioAccountTemplate <- submit bank do
+        exerciseCmd basicFabioAccountTemplate with CreditAmount 
+            with
+                amountToCredit = 10.0
+    
+    -- Unhappy test to validate that party doesn't have access
+    submitMustFail fabio do
+        exerciseCmd basicFabioAccountTemplate with CreditAmount
+            with 
+                amountToCredit = 10.0
+
+    -- Unhappy test to validate debit amount 
+    submitMustFail bank do
+        exerciseCmd basicFabioAccountTemplate with DebitAmount 
+            with
+                amountToDebit = 50.0
+
+    -- Unhappy test to validate that party doesn't have access
+    submitMustFail fabio do
+        exerciseCmd basicFabioAccountTemplate with DebitAmount 
+            with
+                amountToDebit = 5.0
+
+---------------------------- End: create a bank and accounts in bank ----------------------------
+
+    return()

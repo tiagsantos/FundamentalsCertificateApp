@@ -1,0 +1,211 @@
+module ComputerStore.ManagementProducts where
+
+import Utils.DataTypesHelper
+import DA.Action(foldlA)
+import DA.Optional
+import Utils.FunctionsHelper
+import Payment.Payments
+import Bank.ManagementBank
+
+{-
+    This template is used to store the products stock 
+-}
+template StockProducts
+    with
+        storeAdmin                  : Party
+        interestedClientsList       : [Party]
+        products                    : [Product]
+        createStockProduct          : Time
+        state                       : Text
+    where
+        signatory storeAdmin 
+        observer interestedClientsList
+        key(storeAdmin)    : (Party)
+        maintainer key
+
+{-
+    This choice add products to stock
+-}
+        choice AddProductToStock: ContractId StockProducts
+            with
+                productToAdd: Product
+            controller storeAdmin 
+            do 
+                assertMsg "Error AddProductToStock: Validation of product fields" (productToAdd.name /= "" && productToAdd.numberInStock>=0 && productToAdd.price>=0.0)
+                create this with 
+                    products = productToAdd::products
+ 
+ {-
+     This choice create a proposal to product orders
+-}       
+        nonconsuming choice OrderProductProposal: ContractId OrderProduct
+            with
+                client                  : Party
+                reference               : Text
+                amountOfProducts        : Int
+            controller client
+                do
+                    assertMsg "Error OrderProductProposal: Amount of products must be higher of 0" (amountOfProducts>0)
+                    let state = "Active"
+                    product <- foldlA(\acc product -> do
+                            if product.reference == reference
+                            then 
+                              return (Some product)
+                            else 
+                                return acc ) None products
+                    assertMsg "Error OrderProductProposal: Validation of product fields" (isSome product)
+                    requestOrder <- getTime   
+                    create OrderProduct with 
+                        product = fromSome product
+                        ..
+ 
+ {-
+    This choice update the product stock or not if the number of produtos is equals 0 or less
+-}
+        choice UpdateProductToStock: ContractId StockProducts
+           with
+               client                  : Party
+               reference               : Text
+               numberProductToUpdate   : Int
+           controller client, storeAdmin
+                do   
+                    assertMsg "Error UpdateProductToStock: Validation of product fields" (numberProductToUpdate/=0)
+
+                    listProducts <- forA products (\product -> do
+                        if product.reference == reference
+                        then do 
+                            let 
+                                updatingProduct = Product with 
+                                    reference = product.reference
+                                    name = product.name
+                                    price =  product.price
+                                    priceWithFees = product.priceWithFees
+                                    numberInStock = product.numberInStock - numberProductToUpdate
+                                
+                            return updatingProduct
+                        else do 
+                            return product 
+                     )
+
+                    create this with 
+                        products = listProducts
+ 
+{-
+    This template is used to store the product orders
+-}
+template OrderProduct
+    with
+        client                      : Party
+        storeAdmin                  : Party
+        product                     : Product
+        amountOfProducts            : Int
+        requestOrder                : Time
+        state                       : Text
+
+    where
+        signatory client
+        observer storeAdmin
+        key(client,storeAdmin)    : (Party, Party)
+        maintainer key._1
+
+{-
+   This choice validate the order by the store and accept or reject the order
+-}        
+        preconsuming choice ValidateOrderByStore: ContractId OrderCourier
+            with
+                courierAdmin: Party
+            controller storeAdmin
+            do
+
+                (stockProductsId, stockProducts) <- fetchByKey @StockProducts (storeAdmin)
+
+                stockProduct <- foldlA(\acc stockProduct -> do
+                            if stockProduct.reference == product.reference
+                            then 
+                              return stockProduct.numberInStock
+                            else 
+                                return acc ) (-1) stockProducts.products
+
+                assertMsg "Error ValidateOrderByStore: Validation of product fields" (amountOfProducts <= stockProduct)
+               
+                let state = "Active"
+                requestCourier <- getTime
+
+                orderProduct  <- create this with state = getStateOfOrderByStore 1
+                orderProductData <- fetch orderProduct
+                orderCourier <- create OrderCourier with 
+                    orderProduct = orderProductData
+                    ..
+                archive orderProduct
+
+                return orderCourier
+
+{-
+    This template is used to store the courier orders
+-}
+template OrderCourier
+    with
+        orderProduct                : OrderProduct
+        requestCourier              : Time
+        state                       : Text
+        courierAdmin                : Party
+    where
+        signatory orderProduct.storeAdmin 
+        observer courierAdmin, orderProduct.client 
+        ensure orderProduct.storeAdmin /= courierAdmin &&  orderProduct.client /= courierAdmin
+
+{-
+   This choice approve the purchase by the customer
+-}    
+        nonconsuming choice ApproveOrderByClient: (ContractId StockProducts, ContractId Transaction)
+            with
+                bankAdmin: Party
+            controller orderProduct.client
+            do
+                let
+                    totalAmount = (intToDecimal(orderProduct.amountOfProducts) * orderProduct.product.priceWithFees)
+                    storeAdmin = orderProduct.storeAdmin
+                    client = orderProduct.client
+                createTransactionPayment <- getTime
+
+                (obtainAccountId, obtainAccount) <- fetchByKey @BankAccount (client, bankAdmin)
+                
+                assertMsg "Error ApproveOrderByClient: Invalid amount to buy the products" (obtainAccount.amount>=totalAmount)
+
+                stockProductsUpdated <- exerciseByKey @StockProducts (orderProduct.storeAdmin) with UpdateProductToStock 
+                    with
+                        client = orderProduct.client
+                        reference = orderProduct.product.reference
+                        numberProductToUpdate = orderProduct.amountOfProducts
+
+                
+                debitTranId <- create TransactionPaymentDebit with ..
+                debitTran <- fetch debitTranId
+
+                creditTranId <- create TransactionPaymentCredit with ..
+                creditTran <- fetch creditTranId
+                
+                let 
+                    productInvoice = ProductInvoice with    
+                        reference = orderProduct.product.reference
+                        name = orderProduct.product.name
+                        priceWithFees = orderProduct.product.priceWithFees
+                        amountRequested = orderProduct.amountOfProducts
+
+
+                transactionEffectiveBank <- create Transaction with 
+                    amountDebit = debitTran
+                    amountCredit = creditTran
+                    product = productInvoice         
+                    ..
+
+                trace "Test ApproveOrderByClient" (return (stockProductsUpdated, transactionEffectiveBank)) -- Trace to debug
+
+{-
+    This choice reject the order by the customer
+-}
+        choice RejectOrderByClient: ()
+                   controller orderProduct.client
+                       do
+                       return()
+                   

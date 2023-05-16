@@ -1,0 +1,76 @@
+module UnitTests.ManagementClientsTest where
+
+import Daml.Script
+import Utils.DataTypesHelper
+import ComputerStore.ManagementClients
+
+
+setup : Script ()
+setup = script do
+
+    now <- getTime
+    bank <- allocatePartyWithHint "BankAdministrator" (PartyIdHint "BankAdministrator") -- Bank 
+    store <- allocatePartyWithHint "StoreAdministrator" (PartyIdHint "StoreAdministrator") -- Store
+    fabio <- allocatePartyWithHint "Fabio" (PartyIdHint "Fabio") -- Client
+    tiago <- allocatePartyWithHint "Tiago" (PartyIdHint "Tiago") -- Courier
+    joao <- allocatePartyWithHint "Joao" (PartyIdHint "Joao") -- Other
+
+
+---------------------------- Start: Create store and accounts in store ----------------------------
+
+    let clientInf = Client with 
+             name = "Fábio Figueiredo Chaves"
+             address = "Rua Cidade Ponta Delgada, Lote 34, 234-122 Lisboa"
+             telephone = "+351973232341"
+
+
+    submitMustFail fabio do
+        createCmd Store 
+            with
+                storeAdmin = store
+                name = "Store of Computer"
+                interestedList = [fabio,tiago, bank] 
+
+    submitMustFail store do
+        createCmd Store 
+            with
+                storeAdmin = store
+                name = ""
+                interestedList = [fabio,tiago, bank] 
+
+    basicStoreTemplate <- submit store do
+        createCmd Store 
+            with
+                storeAdmin = store
+                name = "Store of Computer"
+                interestedList = [fabio ,tiago ,bank] 
+
+    submitMustFail fabio do
+       exerciseCmd basicStoreTemplate with CreateAccountStoreProposal 
+           with
+               client = joao
+               personalClientInf = clientInf
+
+    submitMustFail store do
+       exerciseCmd basicStoreTemplate with CreateAccountStoreProposal 
+           with
+               client = store
+               personalClientInf = clientInf
+
+    basicFabioAccountStoreTemplate <- submit fabio do
+       exerciseCmd basicStoreTemplate with CreateAccountStoreProposal 
+           with
+               client = fabio
+               personalClientInf = clientInf
+
+    submitMustFail fabio do
+       exerciseCmd basicFabioAccountStoreTemplate with CreateAccountStore
+
+    basicFabioAccountStoreTemplate <- submit store do
+       exerciseCmd basicFabioAccountStoreTemplate with CreateAccountStore
+
+
+---------------------------- End: Create store and accounts in store ----------------------------
+
+
+    return()

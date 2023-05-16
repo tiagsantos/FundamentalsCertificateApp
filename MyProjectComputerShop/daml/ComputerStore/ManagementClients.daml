@@ -1,0 +1,108 @@
+module ComputerStore.ManagementClients where
+
+import Utils.DataTypesHelper
+import DA.Optional
+import ComputerStore.ManagementProducts
+
+{-
+    This template is used to store clients accounts in the store
+-}
+template Store
+    with
+        storeAdmin                  : Party
+        name                        : Text
+        interestedList              : [Party]
+    where
+        signatory storeAdmin
+        observer interestedList 
+
+        ensure name /="" &&  storeAdmin `notElem` interestedList
+
+{-
+    This choice creates a new proposal to create an account in the store 
+-}
+        nonconsuming choice CreateAccountStoreProposal: ContractId ClientAccountStoreProposal
+            with
+                client                : Party
+                personalClientInf     : Client
+            controller client 
+                do
+                    assertMsg "Error: Client must be part of interetest list" (client `elem` interestedList)
+                    let 
+                        state = "Pending"
+                    create ClientAccountStoreProposal with ..        
+
+{-
+    This choice serves to add new products to the stock
+-}
+        nonconsuming choice AddStockProducts:  ContractId StockProducts
+            with
+                productsToAdd         :Optional [Product]
+            controller storeAdmin
+                do
+                    let products = fromOptional [] productsToAdd
+                        state = "Active"
+                    forA products (\product -> do
+                        assertMsg "Error AddStockProducts: Add number in stock must higher than 0" (product.numberInStock>0)) 
+
+                    createStockProduct <- getTime
+                    create StockProducts with 
+                        interestedClientsList = interestedList
+                        ..
+                    
+{-
+    This template is used to store client account store proposal
+-}
+template ClientAccountStoreProposal
+    with
+        client                      : Party
+        storeAdmin                  : Party
+        personalClientInf           : Client
+        state                       : Text
+
+    where
+        signatory client
+        observer storeAdmin
+        ensure personalClientInf.name /="" && client /= storeAdmin
+
+        key(client,storeAdmin)    : (Party, Party)
+        maintainer key._1
+
+{-
+    This choice allows reject the proposal to create an account
+-}
+        choice RejectStoreAccountProposal: ()
+            controller storeAdmin
+                do
+                return()
+
+{-
+    This choice serves to create account store
+-}        
+        choice CreateAccountStore: ContractId ClientAccountStore
+            controller storeAdmin 
+                do
+                    let 
+                        state = "Active"
+                    createAccount <- getTime
+                    create ClientAccountStore with ..
+
+{-
+    This template is used to store client accout store
+-}
+template ClientAccountStore
+    with
+        client                      : Party
+        storeAdmin                  : Party
+        personalClientInf           : Client
+        createAccount               : Time
+        state                       : Text
+
+    where
+        signatory client
+        observer storeAdmin
+        ensure personalClientInf.name /="" && client /= storeAdmin
+
+        key(client,storeAdmin)    : (Party, Party)
+        maintainer key._1
+
