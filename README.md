@@ -13,7 +13,7 @@ The project was created using the empty-skeleton template, with the objective of
 5.	After the computer store accepts the order it will immediately call a courier;
 6.	The courier must always accept to take the purchases to the customer's home;
 7.	The customer can accept or reject the purchases;
-8.	8.	After the customer accepts, a transaction is made from the customer's bank account to the computer store's bank account;
+8.	After the customer accepts, a transaction is made from the customer's bank account to the computer store's bank account;
 9.	Finally, an invoice is created with the customer's purchase.
 
 **III. Parties**
@@ -51,12 +51,19 @@ The project was created using the empty-skeleton template, with the objective of
 
 **V. Diagram**
 
------------
+ Doing...
 
 **VI. Tests**
 
------
+- To test end-to-end success cases, use the UnitTests.MainEndToEndHappyTest module and see the result of the scripts;
+- To test each module separately, with unhappy tests and see the result of the scripts, the following modules were created:
+ - UnitTests.ManagementBankTest; 
+ - UnitTests.ManagementClientsTest; 
+ - UnitTests.ManagementProductsTest; 
+ - UnitTests.PaymentsTest. 
 
 **VII. Notes**
 
- - This project was created with Daml version 2.6.0.
+ - This project was created with Daml version 2.6.0;
+ - To simulate some unhappy tests, it was necessary to create the first contracts and follow the workflow successfully to be able to do them.
+   - Example: To create a transaction an order must exist.
