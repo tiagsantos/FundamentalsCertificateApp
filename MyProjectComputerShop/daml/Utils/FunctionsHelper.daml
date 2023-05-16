@@ -1,0 +1,10 @@
+module Utils.FunctionsHelper where
+
+{-
+    Function useful to get state description of order by store
+-}
+getStateOfOrderByStore: Int -> Text
+getStateOfOrderByStore state = 
+    case state of
+        0 -> "RejectedByStore"
+        _ -> "ApprovedByStore"

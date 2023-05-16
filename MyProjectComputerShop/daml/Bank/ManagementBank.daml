@@ -1,0 +1,114 @@
+module Bank.ManagementBank where
+
+import Utils.DataTypesHelper
+
+{-
+    This template is used to store the bank information
+-}
+
+template Bank
+    with
+        bankAdmin                   : Party
+        name                        : Text
+        interestedList              : [Party]
+    where
+        signatory bankAdmin
+        observer interestedList 
+        ensure name /="" && bankAdmin `notElem` interestedList
+        key (bankAdmin) : Party 
+        maintainer key
+
+{-
+   This choice serves to client propose create account in the bank
+-}
+        nonconsuming choice CreateAccountBankProposal: ContractId BankAccountProposal
+            with
+                client : Party
+                personalClientInf : Client
+            controller client 
+                do
+                    assertMsg "Error CreateAccountBankProposal: Client must be part of interetest list" (client `elem` interestedList)
+                    let 
+                        state = "Pending"
+                    create BankAccountProposal with ..
+
+{-
+    This template is used to store the clients proposals accounts in the bank
+-}
+template BankAccountProposal
+    with
+        client                      : Party
+        bankAdmin                   : Party
+        personalClientInf           : Client
+        state                       : Text
+
+    where
+        signatory client, bankAdmin
+        ensure personalClientInf.name /="" && client /= bankAdmin
+
+        key(client, bankAdmin)    : (Party, Party)
+        maintainer key._2
+{-
+   This choice serves to bank reject create account in the bank
+-}
+        choice RejectBankAccountProposal: ()
+            controller bankAdmin
+                do
+                return()
+
+{-
+   This choice serves to bank approve and create account in the bank
+-}       
+        choice CreateAccountBank: ContractId BankAccount
+            controller bankAdmin 
+                do
+                    let 
+                        state = "Active"
+                        amount = 0.0
+                    createAccount <- getTime
+                    create BankAccount with ..
+
+
+{-
+    This template is used to store the clients accounts in the bank
+-}
+
+template BankAccount
+    with
+        client                      : Party
+        bankAdmin                   : Party
+        personalClientInf           : Client
+        amount                      : Decimal
+        createAccount               : Time
+        state                       : Text
+
+    where
+        signatory client, bankAdmin
+        ensure personalClientInf.name /="" && client /= bankAdmin 
+
+        key(client, bankAdmin)    : (Party, Party)
+        maintainer key._2
+
+{-
+    This choice serves to bank accept the debit the customer's account
+-}
+        choice DebitAmount: ContractId BankAccount
+            with
+                amountToDebit: Decimal
+            controller bankAdmin
+                do
+                    assertMsg "Error DebitAmount: Invalid amount to buy the products" (amount>=amountToDebit)
+                    create this with 
+                        amount = (this.amount - amountToDebit)
+
+{-
+    This choice serves to bank accept the credit amount to the customer's (in this case the store account)
+-}
+        choice CreditAmount: ContractId BankAccount
+            with
+                amountToCredit: Decimal
+            controller bankAdmin
+                do
+                     assertMsg "Error CreditAmount: Invalid amount to credit" (amountToCredit>0.0)
+                     create this with 
+                        amount = (this.amount + amountToCredit)
